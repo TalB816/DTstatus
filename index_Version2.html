@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Service Status Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
+    header { background: #20232a; color: white; padding: 1rem; text-align: center; }
+    main { max-width: 800px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
+    h2 { margin-top: 0; }
+    .incident { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-left: 6px solid red;}
+    .incident.resolved { border-left-color: green;}
+    .incident p { margin: 0.5rem 0;}
+    .updates { margin-top: 1rem; padding-left: 1rem; border-left: 2px dashed #aaa;}
+    form input, form textarea, form select, form button { display: block; width: 100%; margin: 0.5rem 0; padding: 0.5rem;}
+    .severity-high { color: red; font-weight: bold;}
+    .severity-medium { color: orange; font-weight: bold;}
+    .severity-low { color: green; font-weight: bold;}
+    .timestamp { color: #888; font-size: 0.9em; margin-left: 0.5em;}
+    .update-input { margin-top: 0.5rem; display: flex; gap: 0.5em;}
+    .update-input input[type="text"] { flex: 1; padding: 0.5em; font-size: 1em;}
+    .update-input button { padding: 0.5em 1em; font-size: 1em; cursor: pointer;}
+    .resolved-label { color: green; font-weight: bold; margin-left: 1em;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>System Status</h1>
+    <p>Check for active outages and updates</p>
+  </header>
+  <main>
+    <h2>Report New Outage</h2>
+    <form id="incidentForm" autocomplete="off" aria-label="Report New Outage">
+      <input type="text" id="title" placeholder="Title" required aria-label="Outage Title" />
+      <textarea id="description" placeholder="Description" required aria-label="Outage Description"></textarea>
+      <input type="text" id="impact" placeholder="Impact (e.g., Order flow disruption)" required aria-label="Outage Impact" />
+      <select id="severity" aria-label="Outage Severity">
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+      <button type="submit">Create Outage</button>
+    </form>
+
+    <h2>Active Outages</h2>
+    <div id="incidentList"></div>
+  </main>
+  <script>
+    // Initialize Supabase
+    const SUPABASE_URL = 'https://wypniioyvbqqmcdecqwr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cG5paW95dmJxcW1jZGVjcXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzODg0NzEsImV4cCI6MjA2ODk2NDQ3MX0.d95JnAF37ZkK79HUT45lBoKMzNZSS8rzoVz2uZGvgeY';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[m];
+      });
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleString();
+    }
+
+    const form = document.getElementById('incidentForm');
+    const incidentList = document.getElementById('incidentList');
+
+    async function fetchIncidents() {
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        incidentList.innerHTML = `<p style="color: red;">Failed to load incidents.</p>`;
+        return [];
+      }
+      return data;
+    }
+
+    async function renderIncidents() {
+      const incidents = await fetchIncidents();
+      incidentList.innerHTML = '';
+      if (incidents.length === 0) {
+        incidentList.innerHTML = '<p>No active outages reported.</p>';
+        return;
+      }
+      incidents.forEach((incident) => {
+        const div = document.createElement('div');
+        div.className = `incident${incident.resolved ? ' resolved' : ''}`;
+
+        let updatesHTML = '';
+        const updates = incident.updates || [];
+        if (updates.length === 0) {
+          updatesHTML = '<li><em>No updates yet.</em></li>';
+        } else {
+          updatesHTML = updates.map(update =>
+            `<li>
+              ${escapeHTML(update.text || update)}
+              <span class="timestamp">${formatDate(update.time)}</span>
+            </li>`
+          ).join('');
+        }
+
+        div.innerHTML = `
+          <h3>${escapeHTML(incident.title)}
+            ${incident.resolved ? `<span class="resolved-label" aria-label="Resolved">Resolved</span>` : ''}
+          </h3>
+          <p><strong>Description:</strong> ${escapeHTML(incident.description)}</p>
+          <p><strong>Impact:</strong> ${escapeHTML(incident.impact)}</p>
+          <p>
+            <strong>Severity:</strong>
+            <span class="severity-${incident.severity}">${escapeHTML(incident.severity)}</span>
+            <span class="timestamp">${formatDate(incident.created_at)}</span>
+          </p>
+          <div class="updates">
+            <strong>Updates:</strong>
+            <ul>${updatesHTML}</ul>
+            ${incident.resolved ? '' : `
+              <form class="update-input" data-id="${incident.id}" autocomplete="off" aria-label="Add Update">
+                <input type="text" placeholder="Post an update..." aria-label="Update Text" required />
+                <button type="submit">Add</button>
+                <button type="button" class="resolve-btn">Mark as Resolved</button>
+              </form>
+            `}
+          </div>
+        `;
+        incidentList.appendChild(div);
+      });
+
+      // Attach update form events
+      document.querySelectorAll('.update-input').forEach(formEl => {
+        formEl.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const id = formEl.getAttribute('data-id');
+          const input = formEl.querySelector('input[type="text"]');
+          const text = input.value.trim();
+          if (text) {
+            await addUpdate(id, text);
+            input.value = '';
+            input.focus();
+          }
+        });
+        formEl.querySelector('.resolve-btn').addEventListener('click', async () => {
+          const id = formEl.getAttribute('data-id');
+          await markResolved(id);
+        });
+      });
+    }
+
+    async function addUpdate(id, text) {
+      // Get current updates
+      const { data, error } = await supabase.from('incidents').select('updates').eq('id', id).single();
+      if (error) return;
+      const updates = data.updates || [];
+      updates.push({ text, time: new Date().toISOString() });
+      await supabase.from('incidents').update({ updates }).eq('id', id);
+      renderIncidents();
+    }
+
+    async function markResolved(id) {
+      await supabase.from('incidents').update({ resolved: true }).eq('id', id);
+      renderIncidents();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const impact = document.getElementById('impact').value.trim();
+      const severity = document.getElementById('severity').value;
+      if (!title || !description || !impact) return;
+      await supabase.from('incidents').insert([{
+        title, description, impact, severity,
+        updates: [],
+        resolved: false,
+      }]);
+      renderIncidents();
+      form.reset();
+      form.querySelector('input, textarea').focus();
+    });
+
+    // Initial render
+    renderIncidents();
+  </script>
+</body>
+</html>

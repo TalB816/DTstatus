@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Status - Read Only</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
+    header { background: #20232a; color: white; padding: 1rem; text-align: center; }
+    main { max-width: 800px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
+    h2 { margin-top: 0; }
+    .incident { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-left: 6px solid red;}
+    .incident.resolved { border-left-color: green;}
+    .incident p { margin: 0.5rem 0;}
+    .updates { margin-top: 1rem; padding-left: 1rem; border-left: 2px dashed #aaa;}
+    .severity-high { color: red; font-weight: bold;}
+    .severity-medium { color: orange; font-weight: bold;}
+    .severity-low { color: green; font-weight: bold;}
+    .timestamp { color: #888; font-size: 0.9em; margin-left: 0.5em;}
+    .resolved-label { color: green; font-weight: bold; margin-left: 1em;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>System Status</h1>
+    <p>This page is read-only and displays current and past outages.</p>
+  </header>
+  <main>
+    <h2>Outage History</h2>
+    <div id="incidentList"></div>
+  </main>
+  <script>
+    // Initialize Supabase
+    const SUPABASE_URL = 'https://wypniioyvbqqmcdecqwr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cG5paW95dmJxcW1jZGVjcXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzODg0NzEsImV4cCI6MjA2ODk2NDQ3MX0.d95JnAF37ZkK79HUT45lBoKMzNZSS8rzoVz2uZGvgeY';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[m];
+      });
+    }
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleString();
+    }
+    async function fetchIncidents() {
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        document.getElementById('incidentList').innerHTML = `<p style="color: red;">Failed to load incidents.</p>`;
+        return [];
+      }
+      return data;
+    }
+    async function renderIncidents() {
+      const incidents = await fetchIncidents();
+      const incidentList = document.getElementById('incidentList');
+      incidentList.innerHTML = '';
+      if (incidents.length === 0) {
+        incidentList.innerHTML = '<p>No outages have been reported.</p>';
+        return;
+      }
+      incidents.forEach((incident) => {
+        const div = document.createElement('div');
+        div.className = `incident${incident.resolved ? ' resolved' : ''}`;
+
+        let updatesHTML = '';
+        const updates = incident.updates || [];
+        if (updates.length === 0) {
+          updatesHTML = '<li><em>No updates yet.</em></li>';
+        } else {
+          updatesHTML = updates.map(update =>
+            `<li>
+              ${escapeHTML(update.text || update)}
+              <span class="timestamp">${formatDate(update.time)}</span>
+            </li>`
+          ).join('');
+        }
+
+        div.innerHTML = `
+          <h3>${escapeHTML(incident.title)}
+            ${incident.resolved ? `<span class="resolved-label" aria-label="Resolved">Resolved</span>` : ''}
+          </h3>
+          <p><strong>Description:</strong> ${escapeHTML(incident.description)}</p>
+          <p><strong>Impact:</strong> ${escapeHTML(incident.impact)}</p>
+          <p>
+            <strong>Severity:</strong>
+            <span class="severity-${incident.severity}">${escapeHTML(incident.severity)}</span>
+            <span class="timestamp">${formatDate(incident.created_at)}</span>
+          </p>
+          <div class="updates">
+            <strong>Updates:</strong>
+            <ul>${updatesHTML}</ul>
+          </div>
+        `;
+        incidentList.appendChild(div);
+      });
+    }
+    renderIncidents();
+  </script>
+</body>
+</html>
