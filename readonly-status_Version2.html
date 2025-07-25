@@ -178,6 +178,15 @@
 
     // Initial render
     renderIncidents();
+
+    // Add Supabase real-time subscription for the incidents table
+    supabase
+      .channel('realtime:incidents')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, payload => {
+        renderIncidents();
+      })
+      .subscribe();
+
   </script>
 </body>
 </html>
