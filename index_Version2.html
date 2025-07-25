@@ -6,23 +6,100 @@
   <title>Service Status Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
-    header { background: #20232a; color: white; padding: 1rem; text-align: center; }
-    main { max-width: 800px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
-    h2 { margin-top: 0; }
-    .incident { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-left: 6px solid red;}
-    .incident.resolved { border-left-color: green;}
-    .incident p { margin: 0.5rem 0;}
-    .updates { margin-top: 1rem; padding-left: 1rem; border-left: 2px dashed #aaa;}
-    form input, form textarea, form select, form button { display: block; width: 100%; margin: 0.5rem 0; padding: 0.5rem;}
-    .severity-high { color: red; font-weight: bold;}
-    .severity-medium { color: orange; font-weight: bold;}
-    .severity-low { color: green; font-weight: bold;}
-    .timestamp { color: #888; font-size: 0.9em; margin-left: 0.5em;}
-    .update-input { margin-top: 0.5rem; display: flex; gap: 0.5em;}
-    .update-input input[type="text"] { flex: 1; padding: 0.5em; font-size: 1em;}
-    .update-input button { padding: 0.5em 1em; font-size: 1em; cursor: pointer;}
-    .resolved-label { color: green; font-weight: bold; margin-left: 1em;}
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #20232a;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .incident {
+      border: 1px solid #ccc;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-left: 6px solid red;
+    }
+    .incident.resolved {
+      border-left-color: green;
+    }
+    .incident p {
+      margin: 0.5rem 0;
+    }
+    .updates {
+      margin-top: 1rem;
+      padding-left: 1rem;
+      border-left: 2px dashed #aaa;
+    }
+    form input,
+    form textarea,
+    form select,
+    form button {
+      display: block;
+      width: 100%;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+    }
+    .severity-high {
+      color: red;
+      font-weight: bold;
+    }
+    .severity-medium {
+      color: orange;
+      font-weight: bold;
+    }
+    .severity-low {
+      color: green;
+      font-weight: bold;
+    }
+    .timestamp {
+      color: #888;
+      font-size: 0.9em;
+      margin-left: 0.5em;
+    }
+    /* Update input area */
+    .update-input {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5em;
+    }
+    .update-input textarea {
+      resize: vertical;
+      min-height: 3em;
+      font-size: 1em;
+      padding: 0.5em;
+    }
+    .update-input .button-row {
+      display: flex;
+      gap: 0.5em;
+      margin-top: 0.25em;
+    }
+    .update-input button {
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .resolved-label {
+      color: green;
+      font-weight: bold;
+      margin-left: 1em;
+    }
   </style>
 </head>
 <body>
@@ -127,9 +204,11 @@
             <ul>${updatesHTML}</ul>
             ${incident.resolved ? '' : `
               <form class="update-input" data-id="${incident.id}" autocomplete="off" aria-label="Add Update">
-                <input type="text" placeholder="Post an update..." aria-label="Update Text" required />
-                <button type="submit">Add</button>
-                <button type="button" class="resolve-btn">Mark as Resolved</button>
+                <textarea placeholder="Post an update..." aria-label="Update Text" required rows="3"></textarea>
+                <div class="button-row">
+                  <button type="submit">Add</button>
+                  <button type="button" class="resolve-btn">Mark as Resolved</button>
+                </div>
               </form>
             `}
           </div>
@@ -142,12 +221,12 @@
         formEl.addEventListener('submit', async (e) => {
           e.preventDefault();
           const id = formEl.getAttribute('data-id');
-          const input = formEl.querySelector('input[type="text"]');
-          const text = input.value.trim();
+          const textarea = formEl.querySelector('textarea');
+          const text = textarea.value.trim();
           if (text) {
             await addUpdate(id, text);
-            input.value = '';
-            input.focus();
+            textarea.value = '';
+            textarea.focus();
           }
         });
         formEl.querySelector('.resolve-btn').addEventListener('click', async () => {
