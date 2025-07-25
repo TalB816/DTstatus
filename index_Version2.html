@@ -70,7 +70,9 @@
     .timestamp {
       color: #888;
       font-size: 0.9em;
-      margin-left: 0.5em;
+      display: block;
+      margin-top: 0.25em;
+      margin-bottom: 0.5em;
     }
     /* Update input area */
     .update-input {
@@ -149,6 +151,14 @@
       return date.toLocaleString();
     }
 
+    function isResolvedOld(incident) {
+      if (!incident.resolved) return false;
+      if (!incident.created_at) return false;
+      const created = new Date(incident.created_at);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return created < weekAgo;
+    }
+
     const form = document.getElementById('incidentForm');
     const incidentList = document.getElementById('incidentList');
 
@@ -165,7 +175,11 @@
     }
 
     async function renderIncidents() {
-      const incidents = await fetchIncidents();
+      let incidents = await fetchIncidents();
+
+      // Filter out resolved incidents older than a week
+      incidents = incidents.filter(incident => !(incident.resolved && isResolvedOld(incident)));
+
       incidentList.innerHTML = '';
       if (incidents.length === 0) {
         incidentList.innerHTML = '<p>No active outages reported.</p>';
@@ -192,12 +206,12 @@
           <h3>${escapeHTML(incident.title)}
             ${incident.resolved ? `<span class="resolved-label" aria-label="Resolved">Resolved</span>` : ''}
           </h3>
+          <span class="timestamp">${formatDate(incident.created_at)}</span>
           <p><strong>Description:</strong> ${escapeHTML(incident.description)}</p>
           <p><strong>Impact:</strong> ${escapeHTML(incident.impact)}</p>
           <p>
             <strong>Severity:</strong>
             <span class="severity-${incident.severity}">${escapeHTML(incident.severity)}</span>
-            <span class="timestamp">${formatDate(incident.created_at)}</span>
           </p>
           <div class="updates">
             <strong>Updates:</strong>
