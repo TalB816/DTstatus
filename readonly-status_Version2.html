@@ -3,31 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>System Status - Read Only</title>
+  <title>System Status (Read-only)</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
-    header { background: #20232a; color: white; padding: 1rem; text-align: center; }
-    main { max-width: 800px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
-    h2 { margin-top: 0; }
-    .incident { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-left: 6px solid red;}
-    .incident.resolved { border-left-color: green;}
-    .incident p { margin: 0.5rem 0;}
-    .updates { margin-top: 1rem; padding-left: 1rem; border-left: 2px dashed #aaa;}
-    .severity-high { color: red; font-weight: bold;}
-    .severity-medium { color: orange; font-weight: bold;}
-    .severity-low { color: green; font-weight: bold;}
-    .timestamp { color: #888; font-size: 0.9em; margin-left: 0.5em;}
-    .resolved-label { color: green; font-weight: bold; margin-left: 1em;}
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #20232a;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .incident {
+      border: 1px solid #ccc;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-left: 6px solid red;
+    }
+    .incident.resolved {
+      border-left-color: green;
+    }
+    .incident p {
+      margin: 0.5rem 0;
+    }
+    .updates {
+      margin-top: 1rem;
+      padding-left: 1rem;
+      border-left: 2px dashed #aaa;
+    }
+    .severity-high {
+      color: red;
+      font-weight: bold;
+    }
+    .severity-medium {
+      color: orange;
+      font-weight: bold;
+    }
+    .severity-low {
+      color: green;
+      font-weight: bold;
+    }
+    .timestamp {
+      color: #888;
+      font-size: 0.9em;
+      display: block;
+      margin-top: 0.25em;
+      margin-bottom: 0.5em;
+    }
+    .resolved-label {
+      color: green;
+      font-weight: bold;
+      margin-left: 1em;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>System Status</h1>
-    <p>This page is read-only and displays current and past outages.</p>
+    <p>Check for active outages and updates</p>
   </header>
   <main>
-    <h2>Outage History</h2>
+    <h2>Current & Recent Outages</h2>
     <div id="incidentList"></div>
   </main>
   <script>
@@ -47,29 +98,45 @@
         })[m];
       });
     }
+
     function formatDate(dateStr) {
       if (!dateStr) return '';
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return '';
       return date.toLocaleString();
     }
+
+    function isResolvedOld(incident) {
+      if (!incident.resolved) return false;
+      if (!incident.created_at) return false;
+      const created = new Date(incident.created_at);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return created < weekAgo;
+    }
+
+    const incidentList = document.getElementById('incidentList');
+
     async function fetchIncidents() {
       const { data, error } = await supabase
         .from('incidents')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) {
-        document.getElementById('incidentList').innerHTML = `<p style="color: red;">Failed to load incidents.</p>`;
+        incidentList.innerHTML = `<p style="color: red;">Failed to load incidents.</p>`;
         return [];
       }
       return data;
     }
+
     async function renderIncidents() {
-      const incidents = await fetchIncidents();
-      const incidentList = document.getElementById('incidentList');
+      let incidents = await fetchIncidents();
+
+      // Filter out resolved incidents older than a week
+      incidents = incidents.filter(incident => !(incident.resolved && isResolvedOld(incident)));
+
       incidentList.innerHTML = '';
       if (incidents.length === 0) {
-        incidentList.innerHTML = '<p>No outages have been reported.</p>';
+        incidentList.innerHTML = '<p>No active outages reported.</p>';
         return;
       }
       incidents.forEach((incident) => {
@@ -93,12 +160,12 @@
           <h3>${escapeHTML(incident.title)}
             ${incident.resolved ? `<span class="resolved-label" aria-label="Resolved">Resolved</span>` : ''}
           </h3>
+          <span class="timestamp">${formatDate(incident.created_at)}</span>
           <p><strong>Description:</strong> ${escapeHTML(incident.description)}</p>
           <p><strong>Impact:</strong> ${escapeHTML(incident.impact)}</p>
           <p>
             <strong>Severity:</strong>
             <span class="severity-${incident.severity}">${escapeHTML(incident.severity)}</span>
-            <span class="timestamp">${formatDate(incident.created_at)}</span>
           </p>
           <div class="updates">
             <strong>Updates:</strong>
@@ -108,6 +175,8 @@
         incidentList.appendChild(div);
       });
     }
+
+    // Initial render
     renderIncidents();
   </script>
 </body>
